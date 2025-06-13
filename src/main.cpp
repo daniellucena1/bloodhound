@@ -7,8 +7,8 @@
 //   #include "esp_wifi.h"
 // }
 
-const char* ssid = "brisa-2042583";
-const char* password = "dkcghxqs";
+// const char* ssid = "brisa-2042583";
+// const char* password = "dkcghxqs";
 
 // Telegram
 #define BOT_TOKEN "7806065104:AAH2JnEC4V5XFw6Uk4l1W4q40uVFL5Q5tAI"
@@ -134,8 +134,8 @@ const char* password = "dkcghxqs";
 #include <UniversalTelegramBot.h>
 #include <ESP32Ping.h>
 
-// const char* ssid = "SEU_WIFI";
-// const char* password = "SUA_SENHA";
+const char* ssid = "UPE-Estudantes(UnL)";
+const char* password = "OrgulhodeserUPE";
 
 // #define BOT_TOKEN "SEU_BOT_TOKEN"
 // #define CHAT_ID "SEU_CHAT_ID"
