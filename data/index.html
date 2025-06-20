@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Create Account</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <a href="#" class="back-arrow">&#8592;</a>
+      <h1>Create Account</h1>
+    </header>
+
+    <form action="/cadastro" method="get">
+      <main class="form-section">
+        <div class="input-group">
+          <input type="text" placeholder="CPF" class="input-field" name="cpf" required />
+        </div>
+        <div class="input-group">
+          <input type="password" placeholder="Password" class="input-field" name="password" required />
+        </div>
+        <button class="register-button" type="submit">Register</button>
+      </main>
+    </form>
+  </div>
+</body>
+</html>
