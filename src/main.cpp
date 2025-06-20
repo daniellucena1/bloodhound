@@ -164,21 +164,21 @@
 #include <UniversalTelegramBot.h>
 #include <ESP32Ping.h>
 
+// Wi-Fi
 const char* ssid = "brisa-2042583";
 const char* password = "dkcghxqs";
 
+// Telegram
 #define BOT_TOKEN "7806065104:AAH2JnEC4V5XFw6Uk4l1W4q40uVFL5Q5tAI"
 #define CHAT_ID "6310061051"
 
 WiFiClientSecure client;
 UniversalTelegramBot bot(BOT_TOKEN, client);
 
-const char* macWhitelist[] = {
-  "84:F3:EB:12:34:56",
-  "D8:27:0C:AB:CD:EF",
-  "F4:12:FA:AA:BB:CC"
-};
-const int whitelistSize = sizeof(macWhitelist) / sizeof(macWhitelist[0]);
+String ultimoResultado = "";
+unsigned long tempoUltimoScan = 0;
+unsigned long tempoUltimaMensagem = 0;
+unsigned long tempoInicio = 0;
 
 void conectarWiFi() {
   WiFi.mode(WIFI_STA);
@@ -194,89 +194,109 @@ void conectarWiFi() {
   client.setInsecure();
 }
 
-// Função para formatar MAC do tipo uint8_t[6] para String "XX:XX:XX:XX:XX:XX"
-String macToString(uint8_t* mac) {
-  char macStr[18];
-  sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X",
-          mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-  return String(macStr);
-}
-
-bool isKnownMAC(String mac) {
-  mac.toUpperCase();
-  for (int i = 0; i < whitelistSize; i++) {
-    if (mac == macWhitelist[i]) return true;
-  }
-  return false;
-}
-
-// Função para obter o MAC da tabela ARP para o IP dado
-bool getMACFromARP(IPAddress ip, uint8_t* mac) {
-  // Retorna true se MAC encontrado, false caso contrário
-  return WiFi.getARPTable(ip, mac);
-}
-
-void escanearRede() {
+String escanearRede() {
   IPAddress localIP = WiFi.localIP();
   IPAddress subnet = WiFi.subnetMask();
   IPAddress baseIP = localIP & subnet;
 
   Serial.println("Escaneando rede...");
-
-  String mensagem = "🚨 *Dispositivos desconhecidos detectados:*\n\n";
-  bool algumInvasor = false;
+  String mensagem = "📡 *Dispositivos ativos na rede:*\n\n";
+  bool algumAtivo = false;
 
   for (int i = 1; i < 255; i++) {
     IPAddress ip = baseIP;
     ip[3] = i;
 
-    Serial.print("Ping para ");
-    Serial.print(ip.toString());
-    Serial.print(" ... ");
-
     if (Ping.ping(ip, 1)) {
-      Serial.print("OK, tentando obter MAC... ");
-
-      uint8_t mac[6];
-      if (getMACFromARP(ip, mac)) {
-        String macStr = macToString(mac);
-        Serial.println(macStr);
-
-        if (!isKnownMAC(macStr)) {
-          mensagem += "❌ IP: " + ip.toString() + " MAC: " + macStr + "\n";
-          algumInvasor = true;
-        }
-      } else {
-        Serial.println("MAC não encontrado");
-        mensagem += "❓ IP: " + ip.toString() + " (MAC desconhecido)\n";
-        algumInvasor = true;
-      }
-    } else {
-      Serial.println("Sem resposta");
+      mensagem += "🔹 " + ip.toString() + "\n";
+      algumAtivo = true;
     }
   }
 
-  if (algumInvasor) {
-    Serial.println("Enviando alerta para Telegram...");
-    bot.sendMessage(CHAT_ID, mensagem, "Markdown");
-    Serial.println("Alerta enviado!");
+  if (!algumAtivo) {
+    mensagem += "⚠️ Nenhum dispositivo ativo foi detectado.";
+  }
+
+  ultimoResultado = mensagem;
+  return mensagem;
+}
+
+String getUptime() {
+  unsigned long segundos = (millis() / 1000);
+  unsigned long minutos = segundos / 60;
+  unsigned long horas = minutos / 60;
+  minutos = minutos % 60;
+  segundos = segundos % 60;
+
+  char buffer[50];
+  sprintf(buffer, "%luh %lum %lus", horas, minutos, segundos);
+  return String(buffer);
+}
+
+void handleComando(String comando) {
+  if (comando == "/scan") {
+    String resultado = escanearRede();
+    bot.sendMessage(CHAT_ID, resultado, "Markdown");
+  } else if (comando == "/last") {
+    if (ultimoResultado != "") {
+      bot.sendMessage(CHAT_ID, "📄 Último resultado salvo:\n\n" + ultimoResultado, "Markdown");
+    } else {
+      bot.sendMessage(CHAT_ID, "⚠️ Nenhum escaneamento salvo ainda.", "");
+    }
+  } else if (comando == "/status") {
+    String msg = "📶 *Status do ESP32:*\n";
+    msg += "IP: " + WiFi.localIP().toString() + "\n";
+    msg += "RSSI: " + String(WiFi.RSSI()) + " dBm\n";
+    msg += "Modo: " + String(WiFi.getMode() == WIFI_STA ? "Estação (STA)" : "AP") + "\n";
+    msg += "Uptime: " + getUptime();
+    bot.sendMessage(CHAT_ID, msg, "Markdown");
+  } else if (comando == "/wifi") {
+    int redes = WiFi.scanNetworks();
+    String msg = "📡 *Redes Wi-Fi próximas:*\n\n";
+    for (int i = 0; i < redes; i++) {
+      msg += String(i + 1) + ". " + WiFi.SSID(i) + " (" + WiFi.RSSI(i) + " dBm)\n";
+    }
+    bot.sendMessage(CHAT_ID, msg, "Markdown");
+  } else if (comando == "/uptime") {
+    bot.sendMessage(CHAT_ID, "⏱️ Uptime: " + getUptime(), "");
   } else {
-    Serial.println("Nenhum dispositivo desconhecido detectado.");
+    bot.sendMessage(CHAT_ID, "❓ Comando não reconhecido. Use:\n/scan\n/last\n/status\n/wifi\n/uptime", "");
+  }
+}
+
+void checarComandosTelegram() {
+  int numNovasMensagens = bot.getUpdates(bot.last_message_received + 1);
+  while (numNovasMensagens) {
+    for (int i = 0; i < numNovasMensagens; i++) {
+      String texto = bot.messages[i].text;
+      String chat_id = bot.messages[i].chat_id;
+
+      if (chat_id == CHAT_ID) {
+        Serial.println("Comando recebido: " + texto);
+        handleComando(texto);
+      } else {
+        bot.sendMessage(chat_id, "❌ Acesso não autorizado!", "");
+      }
+    }
+    numNovasMensagens = bot.getUpdates(bot.last_message_received + 1);
   }
 }
 
 void setup() {
   Serial.begin(115200);
   conectarWiFi();
-  bot.sendMessage(CHAT_ID, "🚀 ESP32 iniciado e conectado!", "");
-  delay(1000);
-  escanearRede();
+  bot.sendMessage(CHAT_ID, "🤖 Bot iniciado! Comandos disponíveis:\n/scan\n/last\n/status\n/wifi\n/uptime", "");
+  tempoInicio = millis();
 }
 
 void loop() {
-  static unsigned long ultimoScan = 0;
-  if (millis() - ultimoScan > 5 * 60 * 1000) { // a cada 5 minutos
+  if (millis() - tempoUltimoScan > 5 * 60 * 1000) {
     escanearRede();
-    ultimoScan = millis();
+    tempoUltimoScan = millis();
+  }
+
+  if (millis() - tempoUltimaMensagem > 2000) {
+    checarComandosTelegram();
+    tempoUltimaMensagem = millis();
   }
 }
