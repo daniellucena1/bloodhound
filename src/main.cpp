@@ -165,12 +165,11 @@
 #include <ESP32Ping.h>
 
 // Wi-Fi
-const char* ssid = "brisa-2042583";
-const char* password = "dkcghxqs";
-
+const char* ssid = "SEU_WIFI";
+const char* password = "SUA_SENHA";
 // Telegram
-#define BOT_TOKEN "7806065104:AAH2JnEC4V5XFw6Uk4l1W4q40uVFL5Q5tAI"
-#define CHAT_ID "6310061051"
+#define BOT_TOKEN "SEU_TOKEN"
+#define CHAT_ID "SEU_CHAT_ID"
 
 WiFiClientSecure client;
 UniversalTelegramBot bot(BOT_TOKEN, client);
